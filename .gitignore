@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+.vercel/
+*.log
+*.zip
+host/launch
+release/
+site/dist/downloads/
+auth.json
+account/
+account-source.json
+*.pem
+*.key

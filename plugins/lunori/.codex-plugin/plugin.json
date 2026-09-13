@@ -1,0 +1,40 @@
+{
+  "name": "lunori",
+  "version": "0.5.0",
+  "description": "Translate text with your ChatGPT account and choose from your available models.",
+  "author": {
+    "name": "Sergei Nikolenko",
+    "url": "https://github.com/SergeiNikolenko"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Lunori",
+    "shortDescription": "Translate text with your ChatGPT account",
+    "longDescription": "Translate text while preserving inline formatting. Discover models, choose Standard or Fast where supported, and connect your ChatGPT account through the local companion. Requires macOS, Node.js 22+, and the installed Codex runtime. Uses your account limits.",
+    "developerName": "Sergei Nikolenko",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Translate this text into English.",
+      "Show my available translation models.",
+      "Help me connect my ChatGPT account."
+    ],
+    "brandColor": "#315AEA",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png",
+    "websiteURL": "https://lunori-translate.vercel.app",
+    "privacyPolicyURL": "https://lunori-translate.vercel.app/privacy.html",
+    "termsOfServiceURL": "https://lunori-translate.vercel.app/terms.html"
+  },
+  "mcpServers": "./.mcp.json",
+  "keywords": [
+    "translation",
+    "languages",
+    "reading"
+  ],
+  "homepage": "https://lunori-translate.vercel.app",
+  "repository": "https://github.com/SergeiNikolenko/lunori"
+}

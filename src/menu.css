@@ -1,0 +1,34 @@
+:host{--menu-muted:var(--muted)}
+/* Shared visual rules for the popup and isolated floating menu. */
+.luna-ui{--bg:var(--background);--fg:var(--foreground);--menu-muted:var(--muted-foreground);--soft:var(--secondary);--line:var(--border);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em}
+.menu-title{font-size:14px;font-weight:600;letter-spacing:-.02em;line-height:1.3;flex:1}
+.menu-heading{display:flex;align-items:center;gap:10px;min-height:54px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.menu-heading button{flex-shrink:0}
+.menu-group{display:grid;gap:12px;padding:16px}
+.menu-group+.menu-group{border-top:1px solid var(--line)}
+.account-identity{display:flex;align-items:center;gap:12px;padding:4px 0 16px;min-width:0}
+.account-avatar{display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--fg)}
+.account-avatar svg{width:19px;height:19px}
+.account-name{font-size:13px;font-weight:600;overflow-wrap:anywhere;line-height:1.5;color:var(--fg)}
+.account-caption{font-size:13px;line-height:1.5;color:var(--menu-muted);margin-top:2px}
+.account-details{border:1px solid var(--line);border-radius:11px;padding:0 12px;margin:0 0 16px;background:var(--bg)}
+.account-detail{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:40px;font-size:13px}
+.account-detail+.account-detail{border-top:1px solid var(--line)}
+.account-detail>span:first-child{color:var(--menu-muted)}
+.account-value{color:var(--fg);font-weight:500;text-align:right}
+.plan-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;background:var(--soft);font-size:12px;line-height:20px;color:var(--fg);font-weight:500;white-space:nowrap}
+.connection{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--fg)}
+.connection:before{content:'';width:5px;height:5px;border-radius:50%;background:#188653}
+.account-note{margin:12px 0 0;color:var(--menu-muted);font-size:13px;line-height:1.55;text-wrap:pretty}
+.menu-icon{width:16px;height:16px;flex-shrink:0;color:var(--menu-muted);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.menu-trailing{margin-left:auto;color:var(--menu-muted);display:flex;align-items:center;gap:8px;font-size:12px}
+.menu-action{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:9px 10px;border:0;border-radius:8px;background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer;transition:background 120ms ease}
+.menu-action:hover{background:var(--soft)}
+.menu-action:focus-visible{outline:2px solid var(--menu-muted);outline-offset:2px}
+.menu-action:disabled{opacity:.45;cursor:default}
+.menu-primary{display:flex;align-items:center;justify-content:center;gap:8px;min-height:38px;width:100%;padding:9px 12px;background:var(--fg);color:var(--bg);border:1px solid var(--fg);border-radius:9px;font:inherit;font-weight:500;cursor:pointer;text-decoration:none;text-align:center;transition:opacity 120ms ease}
+.menu-primary:hover{opacity:.88}
+.menu-secondary{background:var(--bg);color:var(--fg);border:1px solid var(--line)}
+.menu-secondary:hover{opacity:1;background:var(--soft)}
+.menu-primary:disabled{opacity:.45;cursor:default}
+@media(prefers-reduced-motion:reduce){.menu-action,.menu-primary{transition:none}}

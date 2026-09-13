@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_appName__",
+  "version": "0.5.0",
+  "description": "__MSG_appDescription__",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAileXGvcaBgiz2wsjuBanGmgEHM+Ir/th5oBrwIENvTekua8X0tJqpl1TDA8wFh4PkOO8vuXrWxOowgChgNa3b/DFxPuwwIuWYCN0GYFtGUDAAkrAqqFVDENYmdRWcl1LGYJs5SfudtCvcpb/5x1qEft68Up4YgQDm4ZPeSZh80Y/MrRCgYMQoELsPMBZQlEs4ZHXHvcF/qbcuJPC6W4pOZno+BKC/9pvsALSJz4opcBRM7e/PgqUV5r8PNWeL/OcCPm4GchW4U/1Fu4dQ4tcFefVwUjF+58KZZSof4FKyljG0UOh6f+n7IOmEnOu+ZOHh1eQZiHRgxdmd9oscJfSuQIDAQAB",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "nativeMessaging",
+    "contextMenus"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lunori",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-translation": {
+      "suggested_key": {
+        "default": "Alt+Shift+T"
+      },
+      "description": "Translate page / show original"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "default_locale": "en",
+  "homepage_url": "https://lunori-translate.vercel.app"
+}
