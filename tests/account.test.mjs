@@ -79,6 +79,7 @@ test('two runtimes serialize rotating refreshes and preserve registration on rev
   assert.equal(f.calls.filter(c => c.options.body?.get('grant_type') === 'refresh_token').length, 1);
   const state = JSON.parse(await readFile(join(f.directory, 'connections.json'))); assert.equal(state.profiles.oaiapp_test.refreshToken, 'test-refresh');
   await assert.rejects(f.client.resolveModel('missing'), /unavailable/);
+  assert.equal((await f.client.resolveModel()).model, 'test-model');
   await assert.rejects(f.client.resolveModel('test-model', 'fast'), /Standard/);
 });
 

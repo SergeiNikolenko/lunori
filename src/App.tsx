@@ -36,7 +36,7 @@ function App(){
   try{const result=await chrome.runtime.sendMessage({type:'action',tabId:tab.id,action,options:prefs});if(result.error)throw new Error(result.error);if(action==='showLauncher')void save({launcherHidden:false});if(action!=='showLauncher')setPage(prev=>({...prev,...result}))}catch(e){setFailure(e instanceof Error?e.message:'This action is unavailable')}finally{setBusy(false)}
  }
  async function login(){setBusy(true);setFailure('');try{const result=await chrome.runtime.sendMessage({type:'login',newProfile:!!catalog?.account.sharing});if(result.error)throw new Error(result.error);setLoginUrl(result.authUrl);setLoggingIn(true)}catch(e){setFailure(e instanceof Error?e.message:'Could not start sign-in')}finally{setBusy(false)}}
- useEffect(()=>{if(!catalog?.models.length)return;const model=catalog.models.some(m=>m.id===prefs.model)?prefs.model:catalog.models[0].id;if(model!==prefs.model||prefs.speed!=='standard')void save({model,speed:'standard'})},[catalog,prefs.model,prefs.speed])
+ useEffect(()=>{if(!catalog?.models.length)return;const model=catalog.models.some(m=>m.id===prefs.model)?prefs.model:(catalog.models.find(m=>/luna/i.test(m.id))||catalog.models[0]).id;if(model!==prefs.model||prefs.speed!=='standard')void save({model,speed:'standard'})},[catalog,prefs.model,prefs.speed])
  useEffect(()=>{if(catalog?.login?.pending){setLoggingIn(true);setLoginUrl(catalog.login.authUrl||'')}},[catalog?.login?.pending,catalog?.login?.authUrl])
  const selected=catalog?.models.find(m=>m.id===prefs.model)
  const disabled=busy||!catalog?.account.sharing||!selected||!tab?.id||!/^https?:/.test(tab.url||'')

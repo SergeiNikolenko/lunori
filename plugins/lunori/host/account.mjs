@@ -11,6 +11,9 @@ const SCOPES = 'openid profile email offline_access resource.invoke chatgpt.toke
 const jwks = createRemoteJWKSet(new URL(ISSUER + '/.well-known/jwks.json'));
 const random = () => randomBytes(32).toString('base64url');
 const same = (a, b) => typeof a === 'string' && typeof b === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+export const DEFAULT_MODEL = 'gpt-6-luna';
+// Plans expose different Luna versions; fall back to any Luna before the first listed model.
+export const preferredModel = models => models.find(m => m.id === DEFAULT_MODEL) || models.find(m => /luna/i.test(m.id)) || models[0];
 const sharing = p => !!p?.accessToken && p.scopes?.includes('chatgpt.tokens.use.direct') && p.scopes?.includes('resource.invoke');
 
 export async function verifyIdentity(token, clientId, nonce, keySet = jwks) {
@@ -118,12 +121,12 @@ export function createAccountClient({ directory = join(homedir(), 'Library/Appli
     return { account, models, login: login ? { pending: login.pending, error: login.error, ...(login.pending ? {authUrl: login.authUrl} : {}) } : null, ...(modelError ? { modelError } : {}) };
   }
 
-  async function resolveModel(model = 'gpt-6-luna', speed = 'standard') {
+  async function resolveModel(model = DEFAULT_MODEL, speed = 'standard') {
     if (speed !== 'standard') throw new Error('ChatGPT plan translation currently supports Standard speed.');
     const state = await catalog();
     if (!state.account.sharing) throw new Error('Continue with ChatGPT and enable plan usage.');
     if (state.modelError) throw new Error(state.modelError);
-    const selected = state.models.find(m => m.id === model) || (!model ? state.models[0] : null);
+    const selected = state.models.find(m => m.id === model) || (!model || model === DEFAULT_MODEL ? preferredModel(state.models) : null);
     if (!selected) throw new Error('This model is unavailable for your account. Select an available model.');
     return { model: selected.id, speed, profileId: state.account.profileId };
   }
