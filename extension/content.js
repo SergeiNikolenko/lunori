@@ -3,7 +3,7 @@
   const BLOCKS='p,h1,h2,h3,h4,h5,h6,li,blockquote,figcaption,td,th,dd,dt,div,section,article,[role="paragraph"]';
   const EXCLUDE='script,style,noscript,template,pre,code,kbd,samp,svg,math,canvas,textarea,input,select,button,form,nav,footer,header,aside,[contenteditable]:not([contenteditable="false"]),[translate="no"],.notranslate,[aria-hidden="true"],[hidden],[data-luna-owned]';
   const INLINE=new Set(['A','STRONG','EM','B','I','U','S','SPAN','SMALL','SUP','SUB','MARK','ABBR','BR','CODE','KBD','MATH']);
-  let enabled=false,target='ru',mode='translation',model='gpt-6-luna',speed='standard',epoch=0,sequence=0,working=false,activeBatches=0,error='',done=0;
+  let enabled=false,target='ru',mode='translation',model='gpt-6-luna',effort='low',epoch=0,sequence=0,working=false,activeBatches=0,error='',done=0;
   let observer=null,intersection=null,timer=null,hovered=null;
   const records=new Map(),ready=new Set();
   const owned=new Set();
@@ -101,7 +101,7 @@
     activeBatches++;working=true;const version=epoch;updateDock();
     if(ready.size)void flush();
     try{
-      const result=await send({type:'translate',target,model,speed,segments:batch.map(({id,text})=>({id,text}))});
+      const result=await send({type:'translate',target,model,effort,segments:batch.map(({id,text})=>({id,text}))});
       if(version!==epoch)return;
       if(result.error)throw new Error(result.error);
       const byId=new Map(result.segments.map(s=>[s.id,s.text]));
@@ -125,7 +125,7 @@
     dock=null;updateLauncher();void send({type:'cancel'}).catch(()=>{});
   }
   function start(options={}){
-    stop();target=options.target||target;mode=options.mode||mode;model=options.model||model;speed=options.speed||speed;enabled=true;
+    stop();target=options.target||target;mode=options.mode||mode;model=options.model||model;effort=options.effort||effort;enabled=true;
     intersection=new IntersectionObserver(entries=>{
       for(const entry of entries){const rec=records.get(entry.target);if(entry.isIntersecting&&rec?.state==='pending'){ready.add(rec);blockIndicator(rec);intersection.unobserve(entry.target);}}
       schedule();
@@ -171,7 +171,7 @@
     const close=document.createElement('button');close.textContent='×';close.setAttribute('aria-label','Close');close.onclick=()=>{panel.el.remove();owned.delete(panel.el);previousFocus?.focus?.();};box.addEventListener('keydown',e=>{if(e.key==='Escape')close.click();});head.append(close);
     const original=document.createElement('div');original.className='original';original.textContent=text;
     const result=document.createElement('div');result.className='result';result.setAttribute('role','status');result.textContent='Translating…';box.append(head,original,result);panel.root.append(box);close.focus();
-    try{const response=await send({type:'translate',target,model,speed,segments:[{id:'selection',text}]});result.textContent=response.error||response.segments[0].text;}catch(e){result.textContent=e.message;}
+    try{const response=await send({type:'translate',target,model,effort,segments:[{id:'selection',text}]});result.textContent=response.error||response.segments[0].text;}catch(e){result.textContent=e.message;}
     return {ok:true};
   }
   document.addEventListener('pointerover',event=>{hovered=event.target.closest?.(BLOCKS);},{passive:true});
@@ -186,11 +186,11 @@
   });
   chrome.runtime.onMessage.addListener((message,_sender,reply)=>{
     if(message.type==='showLauncher'){hideLauncher(false);reply({ok:true});return;}
-    if(message.type==='state'){reply({enabled,target,mode,model,speed,done,working,error});return;}
+    if(message.type==='state'){reply({enabled,target,mode,model,effort,done,working,error});return;}
     if(message.type==='start'){start(message);reply({enabled:true});}
     if(message.type==='stop'){stop();reply({enabled:false});}
     if(message.type==='toggle'){enabled?stop():start(message);reply({enabled});}
-    if(message.type==='selection'){target=message.target||target;model=message.model||model;speed=message.speed||speed;void selection(message.text);reply({ok:true});}
+    if(message.type==='selection'){target=message.target||target;model=message.model||model;effort=message.effort||effort;void selection(message.text);reply({ok:true});}
   });
   // A persistent launcher is separate from translated content, so Restore never removes it.
   const launcher=document.createElement('div');
@@ -247,8 +247,8 @@
   const hideTarget=document.createElement('div');hideTarget.className='hide-target';hideTarget.hidden=true;hideTarget.setAttribute('aria-label','Hide toolbar');hideTarget.innerHTML='<span>Hide</span><b>×</b>';launcherRoot.append(hideTarget);
   const modelRow=document.createElement('label');modelRow.className='row model-row';modelRow.append(document.createTextNode('Model'));
   const modelSelect=document.createElement('select');modelSelect.setAttribute('aria-label','Model');modelRow.append(modelSelect);
-  const speedRow=document.createElement('label');speedRow.className='row';speedRow.append(document.createTextNode('Speed'));
-  const speedSelect=document.createElement('select');speedSelect.setAttribute('aria-label','Speed');speedRow.append(speedSelect);
+  const effortRow=document.createElement('label');effortRow.className='row';effortRow.append(document.createTextNode('Reasoning'));
+  const effortSelect=document.createElement('select');effortSelect.setAttribute('aria-label','Reasoning');effortRow.append(effortSelect);
   const accountButton=document.createElement('button');accountButton.className='menu-action account-button';accountButton.innerHTML='<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><span>ChatGPT account</span>';const accountStatus=document.createElement('span');accountStatus.className='menu-trailing';accountButton.append(accountStatus);
   const hideButton=document.createElement('button');hideButton.className='menu-action hide-button';hideButton.textContent='Hide toolbar';hideButton.onclick=()=>hideLauncher(true);
   const accountSection=document.createElement('div');accountSection.className='account-section';accountSection.hidden=true;
@@ -259,14 +259,14 @@
   const cancelLoginButton=document.createElement('button');cancelLoginButton.className='menu-action cancel-login';cancelLoginButton.textContent='Cancel sign-in';cancelLoginButton.hidden=true;
   const accountNote=document.createElement('p');accountNote.className='account-note';accountNote.textContent='Lunori uses your ChatGPT plan limits. Your ChatGPT conversations stay private.';const usageLink=document.createElement('a');usageLink.className='menu-action';usageLink.textContent='Manage usage ↗';usageLink.href='https://chatgpt.com/settings/usage';usageLink.target='_blank';usageLink.rel='noopener noreferrer';accountSection.append(accountInfo,loginButton,authLink,cancelLoginButton,usageLink,accountNote);
   let accountState=null,availableModels=[],accountPoll=null;
-  function fillSpeeds(selectedSpeed){
-    const current=availableModels.find(m=>m.id===modelSelect.value);speedSelect.replaceChildren();
-    for(const [id,label] of [['standard','Standard'],...(current?.fast?[['fast','Fast · higher usage']]:[])]){const o=document.createElement('option');o.value=id;o.textContent=label;speedSelect.append(o)}
-    speedSelect.value=selectedSpeed==='fast'&&current?.fast?'fast':'standard';
+  function fillEfforts(selectedEffort){
+    const current=availableModels.find(m=>m.id===modelSelect.value),efforts=current?.efforts||[];effortSelect.replaceChildren();
+    for(const id of efforts){const o=document.createElement('option');o.value=id;o.textContent=id[0].toUpperCase()+id.slice(1);effortSelect.append(o)}
+    effortSelect.value=efforts.includes(selectedEffort)?selectedEffort:efforts[0]||'';
   }
   function renderAccount(data){
     accountState=data.account||{connected:false};
-    if(Array.isArray(data.models)){const selected=modelSelect.value;availableModels=data.models;modelSelect.replaceChildren();for(const item of availableModels){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;modelSelect.append(option)}modelSelect.value=availableModels.some(m=>m.id===selected)?selected:availableModels[0]?.id||'';modelSelect.disabled=!availableModels.length;speedSelect.disabled=!availableModels.length;fillSpeeds('standard');primary.disabled=!enabled&&!availableModels.length;}
+    if(Array.isArray(data.models)){const selected=modelSelect.value;availableModels=data.models;modelSelect.replaceChildren();for(const item of availableModels){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;modelSelect.append(option)}modelSelect.value=availableModels.some(m=>m.id===selected)?selected:availableModels[0]?.id||'';modelSelect.disabled=!availableModels.length;effortSelect.disabled=!availableModels.length;fillEfforts(effortSelect.value||effort);primary.disabled=!enabled&&!availableModels.length;}
     accountInfo.replaceChildren();
     const identity=document.createElement('div');identity.className='account-identity';
     const avatar=document.createElement('div');avatar.className='account-avatar';avatar.innerHTML='<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>';
@@ -292,9 +292,9 @@
     }catch(e){accountInfo.textContent=e.message}finally{loginButton.disabled=false;positionMenu()}
   };
   cancelLoginButton.onclick=async()=>{await send({type:'loginCancel'});authLink.hidden=true;cancelLoginButton.hidden=true;loginButton.hidden=false;clearInterval(accountPoll);positionMenu()};
-  modelSelect.onchange=()=>{fillSpeeds(speedSelect.value);void chrome.storage?.local.set({model:modelSelect.value,speed:speedSelect.value})};
-  speedSelect.onchange=()=>void chrome.storage?.local.set({speed:speedSelect.value});
-  body.append(row,segments,modelRow,speedRow,primary,accountButton,hideButton,hint,accountSection);panel.append(head,body);launcherRoot.append(toolbar,tip,panel);document.documentElement.append(launcher);
+  modelSelect.onchange=()=>{fillEfforts(effortSelect.value);void chrome.storage?.local.set({model:modelSelect.value,effort:effortSelect.value})};
+  effortSelect.onchange=()=>void chrome.storage?.local.set({effort:effortSelect.value});
+  body.append(row,segments,modelRow,effortRow,primary,accountButton,hideButton,hint,accountSection);panel.append(head,body);launcherRoot.append(toolbar,tip,panel);document.documentElement.append(launcher);
   let openTimer=null,closeTimer=null,menuVersion=0,toggling=false,collapseTimer=null;
   let drag=null,suppressClick=false,position=null,positionTouched=false,snapAnimation=null,recoveryTimer=null;
   const buttonSize=32,edge=12;
@@ -382,15 +382,15 @@
     for(const child of body.children)child.hidden=child===accountSection;
     updateLauncher();expandToolbar();panel.hidden=false;positionMenu();
     trigger.setAttribute('aria-expanded','true');menuButton.setAttribute('aria-expanded','true');
-    modelSelect.disabled=true;speedSelect.disabled=true;primary.disabled=!enabled;
-    const [settings,data]=await Promise.all([chrome.storage?.local.get({target,mode,model,speed,theme:'system'}),send({type:'catalog'}).catch(e=>({error:e.message}))]);
+    modelSelect.disabled=true;effortSelect.disabled=true;primary.disabled=!enabled;
+    const [settings,data]=await Promise.all([chrome.storage?.local.get({target,mode,model,effort,theme:'system'}),send({type:'catalog'}).catch(e=>({error:e.message}))]);
     if(version!==menuVersion)return;
     language.value=settings?.target||target;launcherMode=settings?.mode||mode;
     availableModels=data.models||[];modelSelect.replaceChildren();
     for(const item of availableModels){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;modelSelect.append(option)}
     modelSelect.value=settings?.model||model;if(!modelSelect.value&&availableModels.length)modelSelect.value=availableModels[0].id;
-    modelSelect.disabled=!availableModels.length;speedSelect.disabled=!availableModels.length;primary.disabled=!enabled&&!availableModels.length;
-    fillSpeeds(settings?.speed||speed);renderAccount(data);if(data.error){accountInfo.textContent=data.error;}
+    modelSelect.disabled=!availableModels.length;effortSelect.disabled=!availableModels.length;primary.disabled=!enabled&&!availableModels.length;
+    fillEfforts(settings?.effort||effort);renderAccount(data);if(data.error){accountInfo.textContent=data.error;}
     for(const child of body.children)child.hidden=child===accountSection;
     if(settings?.theme&&settings.theme!=='system')launcher.setAttribute('data-theme',settings.theme);
     for(const button of segments.children)button.setAttribute('aria-pressed',String(button.dataset.mode===launcherMode));
@@ -402,8 +402,8 @@
     if(toggling)return;toggling=true;closeLauncher();
     try{
       if(enabled){stop();return;}
-      const settings=fromMenu?{target:language.value,mode:launcherMode,model:modelSelect.value,speed:speedSelect.value}:await chrome.storage?.local.get({target,mode,model,speed});
-      const options={target:settings?.target||target,mode:settings?.mode||mode,model:settings?.model||model,speed:settings?.speed||speed};
+      const settings=fromMenu?{target:language.value,mode:launcherMode,model:modelSelect.value,effort:effortSelect.value}:await chrome.storage?.local.get({target,mode,model,effort});
+      const options={target:settings?.target||target,mode:settings?.mode||mode,model:settings?.model||model,effort:settings?.effort||effort};
       void chrome.storage?.local.set(options);start(options);
     }finally{toggling=false;updateLauncher();}
   }

@@ -1,5 +1,5 @@
 const HOST='com.lunatranslate.bridge';
-const DEFAULTS={target:'ru',mode:'translation',model:'gpt-6-luna',speed:'standard'};
+const DEFAULTS={target:'ru',mode:'translation',model:'gpt-6-luna',speed:'standard',effort:'low'};
 let nativePort=null,queue=[],running=new Set();
 const pending=new Map(),cache=new Map();
 function connect(){
@@ -24,7 +24,7 @@ function request(payload,job){return new Promise((resolve,reject)=>{
   try{connect().postMessage({...payload,id});}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}
   if(job)job.nativeId=id;
 });}
-function cacheKey(message,text){return [message.target,message.model||'gpt-6-luna',message.speed||'standard',text].join('\0');}
+function cacheKey(message,text){return [message.target,message.model||'gpt-6-luna',message.speed||'standard',message.effort||'low',text].join('\0');}
 function put(key,text){cache.delete(key);cache.set(key,text);while(cache.size>600)cache.delete(cache.keys().next().value);}
 async function pump(){
   if(running.size>=3||!queue.length)return;
@@ -32,7 +32,7 @@ async function pump(){
   try{
     if(job.cancelled)throw new Error('Cancelled');
     const missing=job.message.segments.filter(s=>!cache.has(cacheKey(job.message,s.text)));
-    if(missing.length){const translated=await request({type:'translate',target:job.message.target,model:job.message.model,speed:job.message.speed,segments:missing},job);
+    if(missing.length){const translated=await request({type:'translate',target:job.message.target,model:job.message.model,speed:job.message.speed,effort:job.message.effort,segments:missing},job);
       const source=new Map(missing.map(s=>[s.id,s.text]));
       for(const segment of translated.segments)put(cacheKey(job.message,source.get(segment.id)),segment.text);
     }

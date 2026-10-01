@@ -2,7 +2,7 @@
 
 [Website](https://lunori-translate.vercel.app) · [MIT license](LICENSE) · [Installation skill](skills/install-lunori/SKILL.md)
 
-Read the web in your language. Lunori translates web pages with your ChatGPT plan, preserving links, emphasis, and code. It includes an Arc/Chrome extension, a local macOS companion, and an optional assistant plugin. Version 0.6.0.
+Read the web in your language. Lunori translates web pages with your ChatGPT plan, preserving links, emphasis, and code. It includes an Arc/Chrome extension, a local macOS companion, and an optional assistant plugin. Version 0.6.1.
 
 ## Install
 
@@ -16,7 +16,7 @@ node host/install.mjs
 
 1. Open `chrome://extensions` (Arc: `arc://extensions`), enable Developer mode, choose **Load unpacked**, and select the repository's `extension` folder. Keep that folder in place.
 2. Open Lunori → **ChatGPT account** → **Continue with ChatGPT**, then follow the sign-in link. Sign in and authorize ChatGPT plan usage on OpenAI's website.
-3. Return to Lunori, choose an available model, and translate a normal HTTPS article. **Manage usage** opens ChatGPT's settings for app access and limits.
+3. Return to Lunori, choose a Luna model and reasoning effort (Low, Medium, or High), and translate a normal HTTPS article. **Manage usage** opens ChatGPT's settings for app access and limits.
 
 The companion is copied to `~/Library/Application Support/Lunori/Companion`. The release contains a bundled companion; users do not need `npm install`. Double-clicking `Install.command` is another way to run the installer. No Chrome Web Store registration or fee is needed.
 

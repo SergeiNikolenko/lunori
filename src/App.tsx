@@ -5,11 +5,11 @@ import {Button} from '@/components/ui/button'
 import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs'
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select'
 import {DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuRadioGroup,DropdownMenuRadioItem,DropdownMenuSeparator,DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
-type Prefs={launcherHidden:boolean;target:string;mode:string;model:string;speed:string;theme:'light'|'dark'|'system'}
-type Model={id:string;name:string;fast:boolean}
+type Prefs={launcherHidden:boolean;target:string;mode:string;model:string;speed:string;effort:string;theme:'light'|'dark'|'system'}
+type Model={id:string;name:string;fast:boolean;efforts:string[]}
 type Catalog={models:Model[];account:{connected:boolean;sharing?:boolean;email?:string;plan?:string;source?:string};login?:{pending:boolean;error?:string;authUrl?:string};modelError?:string;error?:string}
 type Page={enabled:boolean;done:number;working:boolean;error?:string}
-const initial:Prefs={launcherHidden:false,target:'ru',mode:'translation',model:'gpt-6-luna',speed:'standard',theme:'system'}
+const initial:Prefs={launcherHidden:false,target:'ru',mode:'translation',model:'gpt-6-luna',speed:'standard',effort:'low',theme:'system'}
 const languages=[['ru','Russian'],['en','English'],['de','Deutsch'],['fr','Français'],['es','Español'],['zh','中文'],['ja','日本語']]
 function App(){
  const [prefs,setPrefs]=useState(initial),[page,setPage]=useState<Page>({enabled:false,done:0,working:false})
@@ -36,7 +36,7 @@ function App(){
   try{const result=await chrome.runtime.sendMessage({type:'action',tabId:tab.id,action,options:prefs});if(result.error)throw new Error(result.error);if(action==='showLauncher')void save({launcherHidden:false});if(action!=='showLauncher')setPage(prev=>({...prev,...result}))}catch(e){setFailure(e instanceof Error?e.message:'This action is unavailable')}finally{setBusy(false)}
  }
  async function login(){setBusy(true);setFailure('');try{const result=await chrome.runtime.sendMessage({type:'login',newProfile:!!catalog?.account.sharing});if(result.error)throw new Error(result.error);setLoginUrl(result.authUrl);setLoggingIn(true)}catch(e){setFailure(e instanceof Error?e.message:'Could not start sign-in')}finally{setBusy(false)}}
- useEffect(()=>{if(!catalog?.models.length)return;const model=catalog.models.some(m=>m.id===prefs.model)?prefs.model:(catalog.models.find(m=>/luna/i.test(m.id))||catalog.models[0]).id;if(model!==prefs.model||prefs.speed!=='standard')void save({model,speed:'standard'})},[catalog,prefs.model,prefs.speed])
+ useEffect(()=>{if(!catalog?.models.length)return;const current=catalog.models.find(m=>m.id===prefs.model)||catalog.models[0],effort=current.efforts.includes(prefs.effort)?prefs.effort:current.efforts[0]||'low';if(current.id!==prefs.model||prefs.speed!=='standard'||effort!==prefs.effort)void save({model:current.id,speed:'standard',effort})},[catalog,prefs.model,prefs.speed,prefs.effort])
  useEffect(()=>{if(catalog?.login?.pending){setLoggingIn(true);setLoginUrl(catalog.login.authUrl||'')}},[catalog?.login?.pending,catalog?.login?.authUrl])
  const selected=catalog?.models.find(m=>m.id===prefs.model)
  const disabled=busy||!catalog?.account.sharing||!selected||!tab?.id||!/^https?:/.test(tab.url||'')
@@ -67,8 +67,8 @@ function App(){
     <Tabs value={prefs.mode} onValueChange={value=>void save({mode:value})}><TabsList className="grid h-9 w-full grid-cols-2 rounded-[9px]"><TabsTrigger className="rounded-[7px] text-[13px]" value="bilingual">Bilingual</TabsTrigger><TabsTrigger className="rounded-[7px] text-[13px]" value="translation">Translation only</TabsTrigger></TabsList></Tabs>
    </section>
    <section className="menu-group">
-    {row('Model',prefs.model,(catalog?.models||[]).map(m=>[m.id,m.name]),value=>void save({model:value,speed:catalog?.models.find(m=>m.id===value)?.fast?prefs.speed:'standard'}))}
-    {row('Speed',prefs.speed,[['standard','Standard'],...(selected?.fast?[['fast','Fast · higher usage']]:[])],value=>void save({speed:value}))}
+    {row('Model',prefs.model,(catalog?.models||[]).map(m=>[m.id,m.name]),value=>void save({model:value}))}
+    {row('Reasoning',prefs.effort,(selected?.efforts||[]).map(e=>[e,e[0].toUpperCase()+e.slice(1)]),value=>void save({effort:value}))}
     <Button className="h-[38px] w-full gap-2 rounded-[9px] text-[13px]" disabled={disabled||page.working} onClick={()=>void act('start')}>{page.working?<Loader2 className="size-4 animate-spin"/>:<Languages className="size-4"/>}{page.working?'Translating…':page.enabled?'Apply changes':'Translate page'}</Button>
     {page.enabled&&<Button variant="outline" className="h-[38px] w-full gap-2 rounded-[9px] text-[13px] shadow-none" disabled={busy} onClick={()=>void act('stop')}><RotateCcw className="size-4"/>Show original</Button>}
    </section>

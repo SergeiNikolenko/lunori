@@ -12,8 +12,11 @@ const jwks = createRemoteJWKSet(new URL(ISSUER + '/.well-known/jwks.json'));
 const random = () => randomBytes(32).toString('base64url');
 const same = (a, b) => typeof a === 'string' && typeof b === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 export const DEFAULT_MODEL = 'gpt-6-luna';
-// Plans expose different Luna versions; fall back to any Luna before the first listed model.
-export const preferredModel = models => models.find(m => m.id === DEFAULT_MODEL) || models.find(m => /luna/i.test(m.id)) || models[0];
+export const EFFORTS = ['low', 'medium', 'high'];
+export const DEFAULT_EFFORT = 'low';
+// Lunori offers only the Luna series; plans expose different Luna versions.
+const isLuna = slug => /(^|-)luna($|-)/i.test(slug);
+export const preferredModel = models => models.find(m => m.id === DEFAULT_MODEL) || models[0];
 const sharing = p => !!p?.accessToken && p.scopes?.includes('chatgpt.tokens.use.direct') && p.scopes?.includes('resource.invoke');
 
 export async function verifyIdentity(token, clientId, nonce, keySet = jwks) {
@@ -113,7 +116,10 @@ export function createAccountClient({ directory = join(homedir(), 'Library/Appli
           if (!response.ok) throw new Error(response.status === 401 ? 'Continue with ChatGPT to renew your connection.' : 'Could not load ChatGPT models. Try refreshing.');
           const data = await response.json();
           if (!Array.isArray(data.models)) throw new Error('ChatGPT returned an invalid model catalog.');
-          models = data.models.filter(m => m.visibility === 'list' && typeof m.slug === 'string' && (!m.input_modalities || m.input_modalities.includes('text'))).map(m => ({ id: m.slug, name: m.display_name || m.slug, fast: false }));
+          models = data.models.filter(m => m.visibility === 'list' && typeof m.slug === 'string' && isLuna(m.slug) && (!m.input_modalities || m.input_modalities.includes('text'))).map(m => {
+            const supported = Array.isArray(m.supported_reasoning_levels) ? m.supported_reasoning_levels.map(l => l?.effort) : EFFORTS;
+            return { id: m.slug, name: m.display_name || m.slug, fast: false, efforts: EFFORTS.filter(e => supported.includes(e)) };
+          });
           cache = { profileId: state.active, time: Date.now(), models };
         }
       } catch (error) { modelError = error.message; }
@@ -121,14 +127,16 @@ export function createAccountClient({ directory = join(homedir(), 'Library/Appli
     return { account, models, login: login ? { pending: login.pending, error: login.error, ...(login.pending ? {authUrl: login.authUrl} : {}) } : null, ...(modelError ? { modelError } : {}) };
   }
 
-  async function resolveModel(model = DEFAULT_MODEL, speed = 'standard') {
+  async function resolveModel(model = DEFAULT_MODEL, speed = 'standard', effort = DEFAULT_EFFORT) {
+    if (!EFFORTS.includes(effort)) throw new Error('Reasoning effort must be low, medium, or high.');
     if (speed !== 'standard') throw new Error('ChatGPT plan translation currently supports Standard speed.');
     const state = await catalog();
     if (!state.account.sharing) throw new Error('Continue with ChatGPT and enable plan usage.');
     if (state.modelError) throw new Error(state.modelError);
     const selected = state.models.find(m => m.id === model) || (!model || model === DEFAULT_MODEL ? preferredModel(state.models) : null);
     if (!selected) throw new Error('This model is unavailable for your account. Select an available model.');
-    return { model: selected.id, speed, profileId: state.account.profileId };
+    if (!selected.efforts.includes(effort)) throw new Error('This reasoning effort is unavailable for the selected model.');
+    return { model: selected.id, speed, effort, profileId: state.account.profileId };
   }
 
   function finish(attempt, error = null) {

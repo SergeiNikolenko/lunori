@@ -65,17 +65,17 @@ export async function consumeResponse(response) {
 
 export async function translate(data, { signal, account = { resolveModel, access }, fetchImpl = fetch } = {}) {
   const request = validateRequest(data);
-  const selected = await account.resolveModel(data.model || MODEL, data.speed || 'standard');
+  const selected = await account.resolveModel(data.model || MODEL, data.speed || 'standard', data.effort || 'low');
   const { token } = await account.access(selected.profileId);
   const timeout = AbortSignal.timeout(90000);
   try {
     const response = await fetchImpl('https://api.openai.com/v1/responses', {
       method: 'POST', redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: selected.model, instructions, input: [{ role: 'user', content: JSON.stringify(request) }], store: false, stream: true, text: { format: { type: 'json_schema', name: 'translation', strict: true, schema } } }),
+      body: JSON.stringify({ model: selected.model, instructions, input: [{ role: 'user', content: JSON.stringify(request) }], reasoning: { effort: selected.effort }, store: false, stream: true, text: { format: { type: 'json_schema', name: 'translation', strict: true, schema } } }),
     });
     const result = await consumeResponse(response);
-    return { ...validateResult(result.text, request), model: selected.model, speed: selected.speed, usage: result.usage };
+    return { ...validateResult(result.text, request), model: selected.model, speed: selected.speed, effort: selected.effort, usage: result.usage };
   } catch (error) {
     if (signal?.aborted) throw new Error('Cancelled');
     if (timeout.aborted) throw new Error('ChatGPT did not respond within 90 seconds. Please try again.');

@@ -12,7 +12,7 @@ async function fixture(t, overrides = {}) {
   const calls = []; let expectedNonce, expiresIn = 3600, scopes = 'resource.invoke chatgpt.tokens.use.direct', failRefresh = false;
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
-    if (url.endsWith('/models')) return Response.json({ models: [{ slug: 'test-model', display_name: 'Test', visibility: 'list' }, { slug: 'hidden', visibility: 'hidden' }] });
+    if (url.endsWith('/models')) return Response.json({ models: [{ slug: 'test-luna', display_name: 'Test', visibility: 'list' }, { slug: 'gpt-sol', visibility: 'list' }, { slug: 'hidden', visibility: 'hidden' }] });
     assert.equal(url, 'https://auth.openai.com/api/accounts/oauth/token');
     assert.equal(options.body.get('resource'), 'https://api.openai.com/v1');
     if (options.body.get('grant_type') === 'refresh_token' && failRefresh) return Response.json({}, { status: 400 });
@@ -79,8 +79,12 @@ test('two runtimes serialize rotating refreshes and preserve registration on rev
   assert.equal(f.calls.filter(c => c.options.body?.get('grant_type') === 'refresh_token').length, 1);
   const state = JSON.parse(await readFile(join(f.directory, 'connections.json'))); assert.equal(state.profiles.oaiapp_test.refreshToken, 'test-refresh');
   await assert.rejects(f.client.resolveModel('missing'), /unavailable/);
-  assert.equal((await f.client.resolveModel()).model, 'test-model');
-  await assert.rejects(f.client.resolveModel('test-model', 'fast'), /Standard/);
+  assert.equal((await f.client.resolveModel()).model, 'test-luna');
+  assert.deepEqual((await f.client.catalog()).models.map(m => [m.id, m.efforts]), [['test-luna', ['low', 'medium', 'high']]]);
+  assert.equal((await f.client.resolveModel('test-luna', 'standard', 'high')).effort, 'high');
+  await assert.rejects(f.client.resolveModel('test-luna', 'standard', 'xhigh'), /low, medium, or high/);
+  await assert.rejects(f.client.resolveModel('gpt-sol'), /unavailable/);
+  await assert.rejects(f.client.resolveModel('test-luna', 'fast'), /Standard/);
 });
 
 test('invalid_grant clears unusable credentials and leaves the client registration for reauthorization', async t => {

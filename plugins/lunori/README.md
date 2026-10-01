@@ -10,7 +10,7 @@ macOS, Node.js 22+ at /opt/homebrew/bin or /usr/local/bin, and an eligible ChatG
 
 Unzip this plugin. In Codex, ask the built-in plugin-creator skill to install the extracted lunori folder into your personal marketplace, preserving its MCP server and skill. The public OpenAI directory listing is not available: this local MCP architecture requires separate local-MCP support for public submission. Start a new task after installation so Codex discovers the tools and skill. The server launches with Node and a plugin-relative working directory; it has no npm dependencies.
 
-Example: “Use Lunori to translate this paragraph into English.” Ask “Show my available translation models” to choose a model and speed.
+Example: “Use Lunori to translate this paragraph into English.” Ask “Show my available translation models” to choose a Luna model and reasoning effort (low, medium, or high).
 
 The plugin translates supplied text. Install the separate browser extension to translate pages in place. No browser automation or page-reading permission is included in this plugin.
 
