@@ -1,5 +1,5 @@
 const HOST='com.lunatranslate.bridge';
-const DEFAULTS={target:'ru',mode:'translation',model:'gpt-5.6-luna',speed:'standard'};
+const DEFAULTS={target:'ru',mode:'translation',model:'gpt-6-luna',speed:'standard'};
 let nativePort=null,queue=[],running=new Set();
 const pending=new Map(),cache=new Map();
 function connect(){
@@ -24,7 +24,7 @@ function request(payload,job){return new Promise((resolve,reject)=>{
   try{connect().postMessage({...payload,id});}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}
   if(job)job.nativeId=id;
 });}
-function cacheKey(message,text){return [message.target,message.model||'gpt-5.6-luna',message.speed||'standard',text].join('\0');}
+function cacheKey(message,text){return [message.target,message.model||'gpt-6-luna',message.speed||'standard',text].join('\0');}
 function put(key,text){cache.delete(key);cache.set(key,text);while(cache.size>600)cache.delete(cache.keys().next().value);}
 async function pump(){
   if(running.size>=3||!queue.length)return;
@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
     queue.push({message,tabId:sender.tab.id,reply});void pump();return true;
   }
   if(message.type==='cancel' && sender.tab){cancel(sender.tab.id);reply({ok:true});return;}
-  if(['catalog','login','loginCancel'].includes(message.type)){if(message.type==='login')cache.clear();request({type:message.type,refresh:!!message.refresh}).then(reply,e=>reply({error:e.message}));return true;}
+  if(['catalog','login','loginCancel'].includes(message.type)){if(message.type==='login')cache.clear();request({type:message.type,refresh:!!message.refresh,newProfile:!!message.newProfile}).then(reply,e=>reply({error:e.message}));return true;}
   if(sender.tab)return;
   if(message.type==='health'){request({type:'ping'}).then(reply,e=>reply({error:e.message}));return true;}
   if(message.type==='action'){action(message.tabId,message.action,message.options).then(reply,e=>reply({error:e.message}));return true;}

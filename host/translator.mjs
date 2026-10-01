@@ -1,11 +1,9 @@
-import { cleanEnvironment,linkedAccount,binary as defaultBinary } from './runtime.mjs';
+import { readFile } from 'node:fs/promises';
+import { resolveModel, access } from './account.mjs';
 export { cleanEnvironment } from './runtime.mjs';
-import { resolveModel } from './account.mjs';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
-const here = fileURLToPath(new URL('.', import.meta.url));
-export const MODEL = 'gpt-5.6-luna';
+const instructions = await readFile(new URL('./instructions.txt', import.meta.url), 'utf8');
+const schema = JSON.parse(await readFile(new URL('./schema.json', import.meta.url), 'utf8'));
+export const MODEL = 'gpt-6-luna';
 export const LANGUAGES = {ru:'Russian',en:'English',de:'German',fr:'French',es:'Spanish',zh:'Simplified Chinese',ja:'Japanese'};
 export function validateRequest(data) {
   if (!data || !Object.hasOwn(LANGUAGES,data.target) || !Array.isArray(data.segments) || !data.segments.length || data.segments.length>16) throw new Error('Invalid translation request');
@@ -29,47 +27,58 @@ export function validateResult(text, request) {
   }
   return result;
 }
-export async function translate(data,{signal,binary=defaultBinary}={}) {
-  const request=validateRequest(data);
-  const selected=await resolveModel(data.model||MODEL,data.speed||'standard');
-  const args=['exec','--ignore-user-config','--ephemeral','--skip-git-repo-check','-C',tmpdir(),'-m',selected.model,'-s','read-only','--json','--output-schema',here+'schema.json'];
-  const config={approval_policy:'never',model_reasoning_effort:selected.effort,project_doc_max_bytes:0,model_instructions_file:here+'instructions.txt',forced_login_method:'chatgpt',web_search:'disabled'};
-  if(linkedAccount())config.cli_auth_credentials_store='file';
-  if(selected.speed==='fast')config.service_tier='fast';
-  for(const feature of ['shell_tool','apps','plugins','hooks','multi_agent','browser_use','browser_use_external','computer_use','image_generation','view_image','code_mode','code_mode_host','workspace_dependencies','tool_suggest','goals','sleep_tool','skill_search','memory_tool']) config['features.'+feature]=false;
-  config['features.skip_host_skill_discovery']=true;
-  for(const [key,value] of Object.entries(config)) args.push('-c',key+'='+JSON.stringify(value));
-  args.push('-');
-  return new Promise((resolve,reject)=>{
-    if(signal?.aborted) return reject(new Error('Cancelled'));
-    const child=spawn(binary,args,{cwd:tmpdir(),env:cleanEnvironment(),stdio:['pipe','pipe','pipe'],detached:true});
-    let output='',pending='',failure='',settled=false,usage=null;
-    const stop=()=>{try{process.kill(-child.pid,'SIGKILL');}catch{child.kill('SIGKILL');}};
-    const finish=(err,value)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);if(err){stop();reject(err);}else resolve(value);};
-    const abort=()=>finish(new Error('Cancelled'));
-    const timer=setTimeout(()=>finish(new Error('The model did not respond within 90 seconds. Try again.')),90000);
-    signal?.addEventListener('abort',abort,{once:true});
-    child.on('error',()=>finish(new Error('Codex could not start. Reinstall the local helper.')));
-    child.stdin.on('error',()=>{});
-    child.stderr.on('data',()=>{}); // Never persist credentials, excerpts, or runtime diagnostics.
-    child.stdout.on('data',chunk=>{
-      pending+=chunk;
-      if(pending.length>2_000_000)return finish(new Error('Model response exceeded limit'));
-      let index;
-      while((index=pending.indexOf('\n'))>=0){
-        const line=pending.slice(0,index);pending=pending.slice(index+1);
-        let e;try{e=JSON.parse(line);}catch{continue;}
-        if(e.type==='item.completed' && e.item?.type==='agent_message') output=e.item.text;
-        if(e.type==='turn.completed') usage=e.usage;
-        if(e.type==='turn.failed'||e.type==='error') failure='ChatGPT request failed. Check sign-in and subscription limits.';
-        if(e.type==='item.started' && ['command_execution','mcp_tool_call','web_search','file_change'].includes(e.item?.type)) return finish(new Error('Unexpected tool request blocked'));
+
+export async function consumeResponse(response) {
+  if (!response.ok) throw new Error(response.status === 429 ? 'ChatGPT usage limit reached. Manage usage in ChatGPT Settings → Usage.' : response.status === 401 ? 'Continue with ChatGPT to renew your connection.' : 'ChatGPT could not complete the translation. Please try again.');
+  if (!response.body) throw new Error('ChatGPT returned an empty stream.');
+  let buffer = '', text = '', bytes = 0;
+  const decoder = new TextDecoder();
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 4_000_000) throw new Error('ChatGPT response exceeded the translation limit.');
+      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+      let end;
+      while ((end = buffer.indexOf('\n\n')) !== -1) {
+        const block = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+        const data = block.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
+        if (!data || data === '[DONE]') continue;
+        const event = JSON.parse(data);
+        if (event.type === 'response.output_text.delta') text += event.delta || '';
+        if (['response.failed', 'response.incomplete', 'error'].includes(event.type)) {
+          const code = event.response?.error?.code || event.error?.code || event.code;
+          throw new Error(['subscription_sharing_usage_limit_exceeded', 'subscription_sharing_usage_unavailable'].includes(code) ? 'ChatGPT plan usage is unavailable or its limit was reached. Manage usage in ChatGPT Settings → Usage.' : 'ChatGPT did not complete the translation. Please try again.');
+        }
+        if (event.type === 'response.completed') {
+          if (event.response?.status !== 'completed') throw new Error('ChatGPT did not complete the translation.');
+          const output = event.response.output?.filter(item => item.type === 'message').flatMap(item => item.content || []).filter(item => item.type === 'output_text').map(item => item.text).join('');
+          return { text: output || text, usage: event.response.usage || null };
+        }
       }
+    }
+    throw new Error('ChatGPT stream ended before the translation completed.');
+  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+}
+
+export async function translate(data, { signal, account = { resolveModel, access }, fetchImpl = fetch } = {}) {
+  const request = validateRequest(data);
+  const selected = await account.resolveModel(data.model || MODEL, data.speed || 'standard');
+  const { token } = await account.access(selected.profileId);
+  const timeout = AbortSignal.timeout(90000);
+  try {
+    const response = await fetchImpl('https://api.openai.com/v1/responses', {
+      method: 'POST', redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: selected.model, instructions, input: [{ role: 'user', content: JSON.stringify(request) }], store: false, stream: true, text: { format: { type: 'json_schema', name: 'translation', strict: true, schema } } }),
     });
-    child.on('close',code=>{
-      if(settled)return;
-      if(code!==0||!output)return finish(new Error(failure||'The model returned no translation. Check ChatGPT sign-in and limits.'));
-      try {finish(null,{...validateResult(output,request),model:selected.model,speed:selected.speed,usage});} catch(err){finish(err);}
-    });
-    child.stdin.end(JSON.stringify(request));
-  });
+    const result = await consumeResponse(response);
+    return { ...validateResult(result.text, request), model: selected.model, speed: selected.speed, usage: result.usage };
+  } catch (error) {
+    if (signal?.aborted) throw new Error('Cancelled');
+    if (timeout.aborted) throw new Error('ChatGPT did not respond within 90 seconds. Please try again.');
+    throw error;
+  }
 }

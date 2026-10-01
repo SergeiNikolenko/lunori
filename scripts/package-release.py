@@ -26,8 +26,8 @@ def archive(name,files):
 
 extension=[(p,str(p.relative_to(root/'extension'))) for p in (root/'extension').rglob('*') if p.is_file()]
 mac=[(p,'Lunori/extension/'+name) for p,name in extension]
-mac += [(p,'Lunori/host/'+p.name) for p in (root/'host').iterdir() if p.suffix in ('.mjs','.json','.txt')]
-mac += [(root/name,'Lunori/'+name) for name in ('Install.command','README.md','PRIVACY.md')]
+mac += [(p,'Lunori/host/'+p.name) for p in (root/'host').iterdir() if p.suffix in ('.mjs','.json','.txt') and p.name != 'dependencies-entry.mjs']
+mac += [(root/name,'Lunori/'+name) for name in ('Install.command','README.md','PRIVACY.md','LICENSE','THIRD_PARTY_NOTICES.md')]
 plugin=[(p,'lunori/'+str(p.relative_to(args.plugin))) for p in args.plugin.rglob('*') if p.is_file()]
 checks=[archive('lunori-chrome-web-store.zip',extension),archive('lunori-macos.zip',mac),archive('lunori-codex.zip',plugin)]
 (out/'SHA256SUMS.txt').write_text('\n'.join(checks)+'\n')

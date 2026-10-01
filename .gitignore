@@ -13,3 +13,7 @@ account/
 account-source.json
 *.pem
 *.key
+
+connections.json
+connections.json.*
+ChatGPT/

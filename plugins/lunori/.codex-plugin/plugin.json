@@ -1,6 +1,6 @@
 {
   "name": "lunori",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Translate text with your ChatGPT account and choose from your available models.",
   "author": {
     "name": "Sergei Nikolenko",
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "Lunori",
     "shortDescription": "Translate text with your ChatGPT account",
-    "longDescription": "Translate text while preserving inline formatting. Discover models, choose Standard or Fast where supported, and connect your ChatGPT account through the local companion. Requires macOS, Node.js 22+, and the installed Codex runtime. Uses your account limits.",
+    "longDescription": "Translate text while preserving inline formatting. Connect ChatGPT with the official Sign in with ChatGPT flow and use your plan limits. Requires macOS, Node.js 22+, and an eligible ChatGPT Plus or Pro account.",
     "developerName": "Sergei Nikolenko",
     "category": "Productivity",
     "capabilities": [

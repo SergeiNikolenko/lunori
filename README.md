@@ -1,6 +1,12 @@
 # Lunori
 
-[Website](https://lunori-translate.vercel.app) · [Installation skill](skills/install-lunori/SKILL.md)
+[Website](https://lunori-translate.vercel.app) · [MIT license](LICENSE) · [Installation skill](skills/install-lunori/SKILL.md)
+
+Read the web in your language. Lunori translates web pages with your ChatGPT plan, preserving links, emphasis, and code. It includes an Arc/Chrome extension, a local macOS companion, and an optional assistant plugin. Version 0.6.0.
+
+## Install
+
+Requires macOS, Chrome or Arc, Node.js 22+, and an eligible ChatGPT Plus or Pro account with permission to use its plan in Lunori. No OpenAI API key or installed Codex runtime is required.
 
 ```sh
 git clone https://github.com/SergeiNikolenko/lunori.git
@@ -8,48 +14,46 @@ cd lunori
 node host/install.mjs
 ```
 
-Then open `arc://extensions`, enable Developer mode, choose **Load unpacked**, and select this repository’s `extension` folder. Version 0.5.0.
+1. Open `chrome://extensions` (Arc: `arc://extensions`), enable Developer mode, choose **Load unpacked**, and select the repository's `extension` folder. Keep that folder in place.
+2. Open Lunori → **ChatGPT account** → **Continue with ChatGPT**, then follow the sign-in link. Sign in and authorize ChatGPT plan usage on OpenAI's website.
+3. Return to Lunori, choose an available model, and translate a normal HTTPS article. **Manage usage** opens ChatGPT's settings for app access and limits.
 
-Read the web in your language. Lunori translates web-page text with your ChatGPT account, preserving links, emphasis, and code. Its companion Codex plugin translates text directly from a conversation.
+The companion is copied to `~/Library/Application Support/Lunori/Companion`. The release contains a bundled companion; users do not need `npm install`. Double-clicking `Install.command` is another way to run the installer. No Chrome Web Store registration or fee is needed.
 
-## Requirements
+## ChatGPT plan connection
 
-- macOS, Chrome or Arc, Node.js 22 or newer.
-- A compatible ChatGPT or Codex desktop installation, or the Codex CLI on PATH.
-- ChatGPT sign-in with access to a supported text model. Translation consumes the account's shared limits. Fast can use more. No API key is needed.
+Lunori implements [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) using OAuth with PKCE and verified OpenID Connect identity. AI requests go directly from your Mac to the public Responses API with the permission you grant. This consumes your existing plan limits; it does not grant access to ChatGPT conversations. Standard speed is supported; model choices come from your connected account.
 
-Windows, Linux, PDF/OCR, video subtitles, and input-field translation are not included in this release. This is an independent project, not an OpenAI or Vercel product.
+Local account records are protected with owner-only permissions in `~/Library/Application Support/Lunori/ChatGPT`. Tokens never go to extension storage or translation tool results. Refreshes are serialized across companion and plugin processes. Old ChatGPT/Codex sign-ins are not read, migrated, or removed.
 
-## Browser installation
-
-1. Extract the macOS download to a folder you intend to keep.
-2. Install Node.js from https://nodejs.org if needed. Open ChatGPT/Codex and sign in with ChatGPT.
-3. Open Terminal in the extracted folder and run `zsh Install.command` (or double-click Install.command).
-4. Open `chrome://extensions` (Arc: `arc://extensions`), enable Developer mode, choose **Load unpacked**, and select the `extension` folder.
-5. Pin Lunori, open a normal web page, and choose **Translate page**. Choose the translation language, model, and speed in the menu.
-
-The companion is copied to `~/Library/Application Support/Lunori/Companion`. Keep the extension folder where it is after loading it. Install directly in developer mode. No store registration or fee is required.
-
-When installing a future store build with a different extension ID, run `node host/install.mjs EXTENSION_ID` using the ID shown on chrome://extensions. This replaces the companion's allowed extension ID.
+Upgrading from 0.5: rerun the installer, reload Lunori on the browser's Extensions page, and connect once through the new flow. Your existing ChatGPT/Codex desktop sign-in stays intact. A successful sign-in or model list alone is not evidence of a completed translation.
 
 ## Controls
 
-- Click the translation icon to translate or restore the original.
-- Hover to reveal the menu. Drag either toolbar button to reposition; drop near an edge to dock.
-- Hide in the menu, or drag to the hide target. Use Undo immediately, **Alt+Shift+H** on an injected page, or the extension popup's **Show toolbar** to restore it.
-- **Alt+Shift+T** starts translation/restores the original on the active page.
-- Choose **Bilingual** or **Translation only**. Visible paragraphs translate in parallel; scrolling continues the translation.
-- Models are read from your account. Fast is available only where supported.
-- **Connect another account** opens official ChatGPT sign-in. It is optional if this computer is already signed in.
+- Click the translation icon to translate or restore the original. Hover for the menu; drag either toolbar button to reposition it.
+- Choose **Bilingual** or **Translation only**. Visible paragraphs translate in parallel; scrolling continues translation.
+- **Alt+Shift+T** translates/restores the page. **Alt+Shift+H** restores a hidden toolbar on an activated page; the popup also has **Show toolbar**.
+- **Connect another account** creates a separate ChatGPT connection for Lunori. **Manage usage** lets you review limits and disconnect access in ChatGPT settings.
 
-## Privacy
+Windows, Linux browser installation, PDF/OCR, video subtitles, and input-field translation are not included. This is an independent project, not an OpenAI or Vercel product.
 
-Text selected for translation is sent to OpenAI through the local runtime. Account credentials remain in the runtime's local credential storage; Lunori does not include them in tool results. A separately connected account is stored under `~/Library/Application Support/LunaTranslate/account` (the legacy folder name is retained for upgrades). Preferences are stored locally in the extension. Translation cache is bounded and kept in memory. No analytics or page-text backend is operated by Lunori. See PRIVACY.md.
+## Privacy and removal
 
-## Remove
+See [PRIVACY.md](PRIVACY.md). No Lunori translation server or analytics service is operated. Remove the browser extension, then run `node host/uninstall.mjs` to remove the companion. Uninstall preserves account records. Disconnect Lunori in ChatGPT settings and separately remove the Lunori/ChatGPT directory if you want to clear its local connection. Legacy LunaTranslate account folders are also preserved.
 
-Remove the extension through the browser, then run `node host/uninstall.mjs` from this folder to remove native-host registration and the installed companion. This preserves your ChatGPT sign-in. To remove a separately connected Lunori account as well, delete the legacy Lunori account folder and account-source.json explicitly; do not delete your main ChatGPT/Codex profile.
+## Development and contributions
 
-## Development
+```sh
+npm ci
+npm run build
+npm run typecheck
+npm test
+```
 
-`npm ci`, `npm run build`, `npm run typecheck`, `npm test`. `npm run preview` serves the local UI. `npm run smoke` performs a real translation and uses account limits. The release ZIP contains no Node dependencies: the companion itself uses Node's standard library.
+`npm run preview` serves a local UI preview. `npm run smoke` performs a real translation after sign-in and consumes plan usage. Authentication tests use isolated temporary profiles and fake HTTP responses; they also verify real JWT signatures with test keys.
+
+The build bundles MIT-licensed `jose` and `proper-lockfile` dependencies into the companion and synchronizes the optional plugin. The OpenAI DevKit is not included. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled dependencies. Report bugs or propose changes through GitHub issues and pull requests; never include tokens or private page text.
+
+## License
+
+Lunori's original code is released under the [MIT License](LICENSE). Third-party dependencies retain their licenses. OpenAI service terms, subscription eligibility, limits, and trademark rules apply separately. A paid or remotely hosted service using ChatGPT plan usage requires OpenAI's approval; the MIT license does not grant that service access.

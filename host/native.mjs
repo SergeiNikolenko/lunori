@@ -5,7 +5,7 @@ function send(message){const body=Buffer.from(JSON.stringify(message));const hea
 async function receive(message){
   if(typeof message?.id!=='string'||message.id.length>100)return;
   if(message.type==='ping')return send({id:message.id,ok:true,model:MODEL});
-  if(['catalog','login','loginCancel'].includes(message.type)){try{return send({id:message.id,...await (message.type==='catalog'?catalog({refresh:!!message.refresh}):message.type==='login'?startLogin():cancelLogin())})}catch(error){return send({id:message.id,error:error.message})}}
+  if(['catalog','login','loginCancel'].includes(message.type)){try{return send({id:message.id,...await (message.type==='catalog'?catalog({refresh:!!message.refresh}):message.type==='login'?startLogin({newProfile:!!message.newProfile}):cancelLogin())})}catch(error){return send({id:message.id,error:error.message})}}
   if(message.type==='cancel'){active.get(message.requestId)?.abort();return;}
   if(message.type!=='translate')return send({id:message.id,error:'Unknown request'});
   if(active.size>=3)return send({id:message.id,error:'Translator is busy'});

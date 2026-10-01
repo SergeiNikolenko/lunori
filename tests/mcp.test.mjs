@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createInterface} from 'node:readline';
@@ -10,18 +10,18 @@ test('MCP discovers tools, translates text, rejects invalid inputs, and survives
  const home=await mkdtemp(join(tmpdir(),'lunori-mcp-'));
  let child;
  try{
- const binary=join(home,'runtime');
- await writeFile(binary,`#!${process.execPath}
-import {createInterface} from 'node:readline';
-for await(const line of createInterface({input:process.stdin})){
- const q=JSON.parse(line);let result={};
- if(process.argv[2]==='exec'){console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify({segments:q.segments.map(s=>({id:s.id,text:'Translated '+s.text}))})}}));process.exit(0)}
- if(q.id===undefined)continue;
- if(q.method==='account/read')result={account:{type:'chatgpt',email:'reader@example.test'}};
- if(q.method==='model/list')result={data:[{model:'test-model',displayName:'Test',supportedReasoningEfforts:[{reasoningEffort:'low'}]}]};
- console.log(JSON.stringify({id:q.id,result}));
-}`,{mode:0o700});
- child=spawn(process.execPath,['host/mcp.mjs'],{env:{...process.env,HOME:home,LUNA_CODEX_BIN:binary},stdio:['pipe','pipe','pipe']});
+ const accountDir=join(home,'Library/Application Support/Lunori/ChatGPT');
+ await mkdir(accountDir,{recursive:true});
+ await writeFile(join(accountDir,'connections.json'),JSON.stringify({hostId:'urn:uuid:test',active:'test-client',profiles:{'test-client':{clientId:'test-client',subject:'test',email:'reader@example.test',accessToken:'fake-test-only',expiresAt:Date.now()+3600000,scopes:['resource.invoke','chatgpt.tokens.use.direct']}}}));
+ const mock=join(home,'mock.mjs');
+ await writeFile(mock,`globalThis.fetch=async(url,options)=>{
+ if(url==='https://api.openai.com/v1/models')return Response.json({models:[{slug:'test-model',display_name:'Test',visibility:'list'}]});
+ if(url!=='https://api.openai.com/v1/responses')throw Error('Unexpected endpoint');
+ const input=JSON.parse(JSON.parse(options.body).input[0].content);
+ const event={type:'response.completed',response:{status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({segments:input.segments.map(s=>({id:s.id,text:'Translated '+s.text}))})}]}]}};
+ return new Response('data: '+JSON.stringify(event)+'\\n\\n');
+ };`);
+ child=spawn(process.execPath,['--import',mock,'host/mcp.mjs'],{env:{...process.env,HOME:home},stdio:['pipe','pipe','pipe']});
  const waiting=new Map();let seq=0;
  createInterface({input:child.stdout}).on('line',line=>{const msg=JSON.parse(line);waiting.get(msg.id)?.(msg);waiting.delete(msg.id)});
  const call=(method,params)=>new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>reject(Error('RPC timed out')),8000);waiting.set(id,r=>{clearTimeout(timer);resolve(r)});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n')});

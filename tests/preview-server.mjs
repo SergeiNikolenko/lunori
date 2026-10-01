@@ -8,7 +8,7 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/control'&&req.method==='POST'){
     if(req.headers.origin!==`http://127.0.0.1:${port}`||req.headers['content-type']!=='application/json'){res.writeHead(403);return res.end();}
     let body='';for await(const chunk of req){body+=chunk;if(body.length>4096){res.writeHead(413);return res.end();}}
-    try{const message=JSON.parse(body);let output;if(message.type==='catalog')output=await catalog({refresh:!!message.refresh});else if(message.type==='login')output=await startLogin();else if(message.type==='loginCancel')output=await cancelLogin();else throw new Error('Unknown control');res.setHeader('Content-Type','application/json');res.end(JSON.stringify(output));}catch(e){res.end(JSON.stringify({error:e.message}));}return;
+    try{const message=JSON.parse(body);let output;if(message.type==='catalog')output=await catalog({refresh:!!message.refresh});else if(message.type==='login')output=await startLogin({newProfile:!!message.newProfile});else if(message.type==='loginCancel')output=await cancelLogin();else throw new Error('Unknown control');res.setHeader('Content-Type','application/json');res.end(JSON.stringify(output));}catch(e){res.end(JSON.stringify({error:e.message}));}return;
   }
   if(path==='/translate'&&req.method==='POST'){
     if(req.headers.origin!==`http://127.0.0.1:${port}`||req.headers['content-type']!=='application/json'){res.writeHead(403);return res.end();}

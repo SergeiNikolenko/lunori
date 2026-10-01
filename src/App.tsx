@@ -7,20 +7,20 @@ import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/compo
 import {DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuRadioGroup,DropdownMenuRadioItem,DropdownMenuSeparator,DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 type Prefs={launcherHidden:boolean;target:string;mode:string;model:string;speed:string;theme:'light'|'dark'|'system'}
 type Model={id:string;name:string;fast:boolean}
-type Catalog={models:Model[];account:{connected:boolean;email?:string;plan?:string;source?:string};login?:{pending:boolean;error?:string};error?:string}
+type Catalog={models:Model[];account:{connected:boolean;sharing?:boolean;email?:string;plan?:string;source?:string};login?:{pending:boolean;error?:string;authUrl?:string};modelError?:string;error?:string}
 type Page={enabled:boolean;done:number;working:boolean;error?:string}
-const initial:Prefs={launcherHidden:false,target:'ru',mode:'translation',model:'gpt-5.6-luna',speed:'standard',theme:'system'}
+const initial:Prefs={launcherHidden:false,target:'ru',mode:'translation',model:'gpt-6-luna',speed:'standard',theme:'system'}
 const languages=[['ru','Russian'],['en','English'],['de','Deutsch'],['fr','Français'],['es','Español'],['zh','中文'],['ja','日本語']]
 function App(){
  const [prefs,setPrefs]=useState(initial),[page,setPage]=useState<Page>({enabled:false,done:0,working:false})
  const [catalog,setCatalog]=useState<Catalog|null>(null),[tab,setTab]=useState<chrome.tabs.Tab|null>(null)
  const [busy,setBusy]=useState(false),[failure,setFailure]=useState(''),[accountView,setAccountView]=useState(false)
  const [loginUrl,setLoginUrl]=useState(''),[loggingIn,setLoggingIn]=useState(false)
- async function refreshCatalog(refresh=false){const data=await chrome.runtime.sendMessage({type:'catalog',refresh});if(data.error)throw new Error(data.error);setCatalog(data);return data as Catalog}
+ async function refreshCatalog(refresh=false){const data=await chrome.runtime.sendMessage({type:'catalog',refresh});if(data.error)throw new Error(data.error);setCatalog(data);if(data.modelError)setFailure(data.modelError);return data as Catalog}
  useEffect(()=>{
   let live=true
   Promise.all([chrome.storage.local.get(initial),chrome.tabs.query({active:true,currentWindow:true}),chrome.runtime.sendMessage({type:'catalog'})]).then(([saved,tabs,data])=>{
-   if(!live)return;setPrefs(saved as Prefs);setTab(tabs[0]||null);if(data.error)setFailure(data.error);else setCatalog(data)
+   if(!live)return;setPrefs(saved as Prefs);setTab(tabs[0]||null);if(data.error)setFailure(data.error);else {setCatalog(data);if(data.modelError)setFailure(data.modelError)}
    const t=tabs[0];if(t?.id&&/^https?:/.test(t.url||''))void chrome.runtime.sendMessage({type:'action',tabId:t.id,action:'state'}).then(result=>{if(live&&!result.error)setPage(result)})
   }).catch(()=>{if(live)setFailure('The local companion is unavailable')})
   const listener=(changes:Record<string,chrome.storage.StorageChange>,area:string)=>{if(area==='local')setPrefs(prev=>{const next={...prev};for(const key of Object.keys(initial) as (keyof Prefs)[])if(changes[key])Object.assign(next,{[key]:changes[key].newValue});return next})}
@@ -35,9 +35,11 @@ function App(){
   if(!tab?.id)return;setBusy(true);setFailure('')
   try{const result=await chrome.runtime.sendMessage({type:'action',tabId:tab.id,action,options:prefs});if(result.error)throw new Error(result.error);if(action==='showLauncher')void save({launcherHidden:false});if(action!=='showLauncher')setPage(prev=>({...prev,...result}))}catch(e){setFailure(e instanceof Error?e.message:'This action is unavailable')}finally{setBusy(false)}
  }
- async function login(){setBusy(true);setFailure('');try{const result=await chrome.runtime.sendMessage({type:'login'});if(result.error)throw new Error(result.error);setLoginUrl(result.authUrl);setLoggingIn(true)}catch(e){setFailure(e instanceof Error?e.message:'Could not start sign-in')}finally{setBusy(false)}}
+ async function login(){setBusy(true);setFailure('');try{const result=await chrome.runtime.sendMessage({type:'login',newProfile:!!catalog?.account.sharing});if(result.error)throw new Error(result.error);setLoginUrl(result.authUrl);setLoggingIn(true)}catch(e){setFailure(e instanceof Error?e.message:'Could not start sign-in')}finally{setBusy(false)}}
+ useEffect(()=>{if(!catalog?.models.length)return;const model=catalog.models.some(m=>m.id===prefs.model)?prefs.model:catalog.models[0].id;if(model!==prefs.model||prefs.speed!=='standard')void save({model,speed:'standard'})},[catalog,prefs.model,prefs.speed])
+ useEffect(()=>{if(catalog?.login?.pending){setLoggingIn(true);setLoginUrl(catalog.login.authUrl||'')}},[catalog?.login?.pending,catalog?.login?.authUrl])
  const selected=catalog?.models.find(m=>m.id===prefs.model)
- const disabled=busy||!catalog?.account.connected||!selected||!tab?.id||!/^https?:/.test(tab.url||'')
+ const disabled=busy||!catalog?.account.sharing||!selected||!tab?.id||!/^https?:/.test(tab.url||'')
  const row=(label:string,value:string,items:string[][],change:(value:string)=>void)=><div className="flex min-h-9 items-center justify-between gap-3"><span className="shrink-0">{label}</span><Select value={value} onValueChange={change} disabled={!items.length}><SelectTrigger aria-label={label} className="h-9 w-[185px] bg-background"><SelectValue placeholder="Unavailable"/></SelectTrigger><SelectContent position="popper" align="end">{items.map(([id,name])=><SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></div>
  const account=catalog?.account
  const plan=({prolite:'Pro Lite',plus:'Plus',pro:'Pro',team:'Team',business:'Business',enterprise:'Enterprise'} as Record<string,string>)[account?.plan?.toLowerCase()||'']||account?.plan||'ChatGPT'
@@ -48,16 +50,17 @@ function App(){
    <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label="Settings"><MoreHorizontal className="size-4"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56"><DropdownMenuRadioGroup value={prefs.theme} onValueChange={value=>void save({theme:value as Prefs['theme']})}><DropdownMenuRadioItem value="light"><Sun className="mr-2 size-4"/>Light</DropdownMenuRadioItem><DropdownMenuRadioItem value="dark"><Moon className="mr-2 size-4"/>Dark</DropdownMenuRadioItem><DropdownMenuRadioItem value="system"><Monitor className="mr-2 size-4"/>System</DropdownMenuRadioItem></DropdownMenuRadioGroup><DropdownMenuSeparator/><DropdownMenuItem onSelect={()=>void act('showLauncher')}><PanelRight className="size-4"/>Show toolbar</DropdownMenuItem><DropdownMenuItem onSelect={()=>void chrome.runtime.sendMessage({type:'clearCache'})}><Trash2 className="size-4"/>Clear cache</DropdownMenuItem><DropdownMenuItem onSelect={()=>void refreshCatalog(true).catch(e=>setFailure(e.message))}><RotateCcw className="size-4"/>Refresh models and account</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
   </header>
   {accountView?<main className="p-4">
-   <div className="account-identity"><div className="account-avatar"><UserRound/></div><div className="min-w-0"><div className="account-name">{account?.connected?account.email:'Connect ChatGPT'}</div><div className="account-caption">{account?.connected?'ChatGPT':'Translation with your subscription'}</div></div></div>
+   <div className="account-identity"><div className="account-avatar"><UserRound/></div><div className="min-w-0"><div className="account-name">{account?.connected?account.email:'Connect ChatGPT'}</div><div className="account-caption">{account?.sharing?'Using ChatGPT plan':'Translation with your subscription'}</div></div></div>
    {account?.connected&&<div className="account-details">
-    <div className="account-detail"><span>Status</span><span className="connection">Connected</span></div>
+    <div className="account-detail"><span>Status</span><span className="connection">{account.sharing?'Connected':'Plan permission needed'}</span></div>
     <div className="account-detail"><span>Plan</span><span className="plan-badge">{plan}</span></div>
-    <div className="account-detail"><span>Sign-in</span><span className="account-value">{account.source==='linked'?'Lunori account':'On this Mac'}</span></div>
+    <div className="account-detail"><span>Sign-in</span><span className="account-value">Sign in with ChatGPT</span></div>
    </div>}
-   {!loggingIn&&<Button variant={account?.connected?'outline':'default'} className="h-[38px] w-full rounded-[9px] text-[13px] shadow-none" disabled={busy} onClick={()=>void login()}>{busy?<Loader2 className="size-4 animate-spin"/>:<UserRound className="size-4"/>}{account?.connected?'Connect another account':'Connect ChatGPT'}</Button>}
+   {!loggingIn&&<Button variant={account?.connected?'outline':'default'} className="h-[38px] w-full rounded-[9px] text-[13px] shadow-none" disabled={busy} onClick={()=>void login()}>{busy?<Loader2 className="size-4 animate-spin"/>:<UserRound className="size-4"/>}{account?.sharing?'Connect another account':'Continue with ChatGPT'}</Button>}
    {loginUrl&&<Button asChild className="h-[38px] w-full rounded-[9px] text-[13px]"><a href={loginUrl} target="_blank" rel="noopener noreferrer">Continue sign-in<ExternalLink className="size-4"/></a></Button>}
    {loggingIn&&<Button variant="ghost" className="mt-2 w-full text-[13px]" onClick={async()=>{const result=await chrome.runtime.sendMessage({type:'loginCancel'});if(result.error){setFailure(result.error);return}setLoggingIn(false);setLoginUrl('')}}>Cancel sign-in</Button>}
-   <p className="account-note">Connecting another account changes Lunori only. Your desktop app stays signed in.</p>
+   <Button asChild variant="ghost" className="mt-2 w-full text-[13px]"><a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Manage usage<ExternalLink className="size-4"/></a></Button>
+   <p className="account-note">Lunori uses your ChatGPT plan limits. Your ChatGPT conversations stay private.</p>
   </main>:<main>
    <section className="menu-group">
     {row('Translate to',prefs.target,languages,value=>void save({target:value}))}
@@ -70,7 +73,7 @@ function App(){
     {page.enabled&&<Button variant="outline" className="h-[38px] w-full gap-2 rounded-[9px] text-[13px] shadow-none" disabled={busy} onClick={()=>void act('stop')}><RotateCcw className="size-4"/>Show original</Button>}
    </section>
    <section className="border-t p-2">
-    <button className="menu-action" onClick={()=>setAccountView(true)}><UserRound className="menu-icon"/><span>ChatGPT account</span><span className="menu-trailing">{account?.connected?<span className="connection">Connected</span>:'Connect'}<ChevronRight className="size-3.5"/></span></button>
+    <button className="menu-action" onClick={()=>setAccountView(true)}><UserRound className="menu-icon"/><span>{account?.sharing?'Using ChatGPT plan':'ChatGPT account'}</span><span className="menu-trailing">{account?.connected?<span className="connection">Connected</span>:'Connect'}<ChevronRight className="size-3.5"/></span></button>
     {prefs.launcherHidden&&<button className="menu-action" onClick={()=>void act('showLauncher')}><PanelRight className="menu-icon"/>Show toolbar</button>}
    </section>
   </main>}

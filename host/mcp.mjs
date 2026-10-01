@@ -5,7 +5,7 @@ const active=new Map();
 const schema=(properties={},required=[])=>({type:'object',properties,required,additionalProperties:false});
 const annotations={readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:true};
 const tools=[
- {name:'translate_text',description:'Translate user-provided text through the local ChatGPT runtime. Uses the account’s shared limits. Preserves numbered inline-format markers.',inputSchema:schema({text:{type:'string',minLength:1,maxLength:6000},target:{type:'string',enum:Object.keys(LANGUAGES)},model:{type:'string'},speed:{type:'string',enum:['standard','fast']}},['text','target']),annotations:{...annotations,idempotentHint:false}},
+ {name:'translate_text',description:'Translate user-provided text through the public Responses API with your ChatGPT plan. Uses the account’s shared limits. Preserves numbered inline-format markers.',inputSchema:schema({text:{type:'string',minLength:1,maxLength:6000},target:{type:'string',enum:Object.keys(LANGUAGES)},model:{type:'string'},speed:{type:'string',enum:['standard','fast']}},['text','target']),annotations:{...annotations,idempotentHint:false}},
  {name:'list_models',description:'List models and Fast availability for the connected ChatGPT account.',inputSchema:schema(),annotations},
  {name:'account_status',description:'Read connection status, email, plan, and sign-in source. Never returns credentials.',inputSchema:schema(),annotations},
  {name:'connect_account',description:'Start official ChatGPT sign-in only when the user explicitly asks to connect an account. Returns a sign-in URL.',inputSchema:schema(),annotations:{...annotations,readOnlyHint:false,idempotentHint:false}},
@@ -16,7 +16,7 @@ async function handle(message){
  const {id,method,params={}}=message;
  if(id===undefined){if(method==='notifications/cancelled')active.get(params.requestId)?.abort();return}
  const result=value=>send({jsonrpc:'2.0',id,result:value});
- if(method==='initialize')return result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'lunori',version:'0.5.0'}});
+ if(method==='initialize')return result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'lunori',version:'0.6.0'}});
  if(method==='ping')return result({});
  if(method==='tools/list')return result({tools});
  if(method!=='tools/call')return send({jsonrpc:'2.0',id,error:{code:-32601,message:'Method not found'}});

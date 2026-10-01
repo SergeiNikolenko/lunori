@@ -3,7 +3,7 @@
   const BLOCKS='p,h1,h2,h3,h4,h5,h6,li,blockquote,figcaption,td,th,dd,dt,div,section,article,[role="paragraph"]';
   const EXCLUDE='script,style,noscript,template,pre,code,kbd,samp,svg,math,canvas,textarea,input,select,button,form,nav,footer,header,aside,[contenteditable]:not([contenteditable="false"]),[translate="no"],.notranslate,[aria-hidden="true"],[hidden],[data-luna-owned]';
   const INLINE=new Set(['A','STRONG','EM','B','I','U','S','SPAN','SMALL','SUP','SUB','MARK','ABBR','BR','CODE','KBD','MATH']);
-  let enabled=false,target='ru',mode='translation',model='gpt-5.6-luna',speed='standard',epoch=0,sequence=0,working=false,activeBatches=0,error='',done=0;
+  let enabled=false,target='ru',mode='translation',model='gpt-6-luna',speed='standard',epoch=0,sequence=0,working=false,activeBatches=0,error='',done=0;
   let observer=null,intersection=null,timer=null,hovered=null;
   const records=new Map(),ready=new Set();
   const owned=new Set();
@@ -254,10 +254,10 @@
   const accountSection=document.createElement('div');accountSection.className='account-section';accountSection.hidden=true;
   const accountBack=document.createElement('button');accountBack.className='menu-action account-back';accountBack.textContent='←';accountBack.setAttribute('aria-label','Back');accountBack.hidden=true;head.prepend(accountBack);
   const accountInfo=document.createElement('div');accountInfo.className='account-info';
-  const loginButton=document.createElement('button');loginButton.className='menu-primary menu-secondary';loginButton.textContent='Connect ChatGPT';
+  const loginButton=document.createElement('button');loginButton.className='menu-primary menu-secondary';loginButton.textContent='Continue with ChatGPT';
   const authLink=document.createElement('a');authLink.className='menu-primary';authLink.textContent='Continue with ChatGPT ↗';authLink.target='_blank';authLink.rel='noopener noreferrer';authLink.hidden=true;
   const cancelLoginButton=document.createElement('button');cancelLoginButton.className='menu-action cancel-login';cancelLoginButton.textContent='Cancel sign-in';cancelLoginButton.hidden=true;
-  const accountNote=document.createElement('p');accountNote.className='account-note';accountNote.textContent='Connecting another account changes Lunori only. Your desktop app stays signed in.';accountSection.append(accountInfo,loginButton,authLink,cancelLoginButton,accountNote);
+  const accountNote=document.createElement('p');accountNote.className='account-note';accountNote.textContent='Lunori uses your ChatGPT plan limits. Your ChatGPT conversations stay private.';const usageLink=document.createElement('a');usageLink.className='menu-action';usageLink.textContent='Manage usage ↗';usageLink.href='https://chatgpt.com/settings/usage';usageLink.target='_blank';usageLink.rel='noopener noreferrer';accountSection.append(accountInfo,loginButton,authLink,cancelLoginButton,usageLink,accountNote);
   let accountState=null,availableModels=[],accountPoll=null;
   function fillSpeeds(selectedSpeed){
     const current=availableModels.find(m=>m.id===modelSelect.value);speedSelect.replaceChildren();
@@ -266,25 +266,28 @@
   }
   function renderAccount(data){
     accountState=data.account||{connected:false};
+    if(Array.isArray(data.models)){const selected=modelSelect.value;availableModels=data.models;modelSelect.replaceChildren();for(const item of availableModels){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;modelSelect.append(option)}modelSelect.value=availableModels.some(m=>m.id===selected)?selected:availableModels[0]?.id||'';modelSelect.disabled=!availableModels.length;speedSelect.disabled=!availableModels.length;fillSpeeds('standard');primary.disabled=!enabled&&!availableModels.length;}
     accountInfo.replaceChildren();
     const identity=document.createElement('div');identity.className='account-identity';
     const avatar=document.createElement('div');avatar.className='account-avatar';avatar.innerHTML='<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>';
-    const info=document.createElement('div'),name=document.createElement('div'),caption=document.createElement('div');name.className='account-name';caption.className='account-caption';name.textContent=accountState.connected?accountState.email:'Connect ChatGPT';caption.textContent=accountState.connected?'ChatGPT':'Translation with your subscription';info.append(name,caption);identity.append(avatar,info);accountInfo.append(identity);
+    const info=document.createElement('div'),name=document.createElement('div'),caption=document.createElement('div');name.className='account-name';caption.className='account-caption';name.textContent=accountState.connected?accountState.email:'Connect ChatGPT';caption.textContent=accountState.sharing?'Using ChatGPT plan':'Translation with your subscription';info.append(name,caption);identity.append(avatar,info);accountInfo.append(identity);
     if(accountState.connected){
       const details=document.createElement('div');details.className='account-details';
       const plan=({prolite:'Pro Lite',plus:'Plus',pro:'Pro',team:'Team',business:'Business',enterprise:'Enterprise'})[accountState.plan?.toLowerCase()]||accountState.plan||'ChatGPT';
-      for(const [label,value,cls] of [['Status','Connected','connection'],['Plan',plan,'plan-badge'],['Sign-in',accountState.source==='linked'?'Lunori account':'On this Mac','account-value']]){const row=document.createElement('div');row.className='account-detail';const key=document.createElement('span'),val=document.createElement('span');key.textContent=label;val.textContent=value;val.className=cls;row.append(key,val);details.append(row)}
+      for(const [label,value,cls] of [['Status','Connected','connection'],['Plan',plan,'plan-badge'],['Sign-in','Sign in with ChatGPT','account-value']]){const row=document.createElement('div');row.className='account-detail';const key=document.createElement('span'),val=document.createElement('span');key.textContent=label;val.textContent=value;val.className=cls;row.append(key,val);details.append(row)}
       accountInfo.append(details);
     }
-    accountStatus.textContent=accountState.connected?'Connected  ›':'Connect  ›';
+    if(data.modelError){const warning=document.createElement('p');warning.textContent=data.modelError;accountInfo.append(warning);}
+    accountStatus.textContent=accountState.sharing?'Using ChatGPT plan  ›':'Connect  ›';
     loginButton.classList.toggle('menu-secondary',!!accountState.connected);
-    loginButton.textContent=accountState.connected?'Connect another account':'Connect ChatGPT';
-    if(data.login&&!data.login.pending){authLink.hidden=true;cancelLoginButton.hidden=true;loginButton.hidden=false;clearInterval(accountPoll);if(data.login.error)accountInfo.textContent=data.login.error;}
+    loginButton.textContent=accountState.sharing?'Connect another account':'Continue with ChatGPT';
+    if(data.login?.pending&&data.login.authUrl){authLink.href=data.login.authUrl;authLink.hidden=false;cancelLoginButton.hidden=false;loginButton.hidden=true;if(!accountPoll)accountPoll=setInterval(()=>void send({type:'catalog',refresh:true}).then(next=>{if(!next.error)renderAccount(next)}),2000);}
+    if(data.login&&!data.login.pending){authLink.hidden=true;cancelLoginButton.hidden=true;loginButton.hidden=false;clearInterval(accountPoll);accountPoll=null;if(data.login.error)accountInfo.textContent=data.login.error;}
   }
   accountButton.onclick=()=>{headTitle.textContent='ChatGPT account';accountBack.hidden=false;for(const child of body.children)child.hidden=child!==accountSection;accountSection.hidden=false;positionMenu()};
   accountBack.onclick=()=>{headTitle.textContent='Lunori';accountBack.hidden=true;for(const child of body.children)child.hidden=child===accountSection;hint.hidden=!error;positionMenu()};
   loginButton.onclick=async()=>{
-    loginButton.disabled=true;try{const result=await send({type:'login'});if(result.error)throw new Error(result.error);authLink.href=result.authUrl;authLink.hidden=false;cancelLoginButton.hidden=false;loginButton.hidden=true;
+    loginButton.disabled=true;try{const result=await send({type:'login',newProfile:!!accountState?.sharing});if(result.error)throw new Error(result.error);authLink.href=result.authUrl;authLink.hidden=false;cancelLoginButton.hidden=false;loginButton.hidden=true;
       clearInterval(accountPoll);accountPoll=setInterval(()=>void send({type:'catalog',refresh:true}).then(data=>{if(!data.error)renderAccount(data)}),2000);
     }catch(e){accountInfo.textContent=e.message}finally{loginButton.disabled=false;positionMenu()}
   };
